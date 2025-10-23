@@ -4,6 +4,18 @@
 
 # Touch-Screen
 
+## Materials Required
+
+To build this project, you’ll need the following components:
+
+- ESP32 – The main microcontroller for logic and connectivity.
+
+- Aluminum Sheet or Foil – Used for conductivity or as a structural element.
+
+- LEDs – Visual indicators or display components.
+
+- Thin Wooden Board – Serves as the base or mounting platform for the Aluminum.
+
 ## Algoritmo de movimiento
 The touch system works with a minimum of six capacitive sensors, arranged in a 2x3 matrix.
 
