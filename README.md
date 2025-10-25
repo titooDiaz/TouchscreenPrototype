@@ -4,39 +4,49 @@
 
 # Touch-Screen
 
-## Materials Required
+A modular capacitive touch interface built with an ESP32, aluminum plates, and LEDs. It detects finger movements (Up, Down, Left, Right) using a scalable matrix of touch sensors.
 
-To build this project, you’ll need the following components:
+---
 
-- ESP32 – The main microcontroller for logic and connectivity.
+## Overview
 
-- Aluminum Sheet or Foil – Used for conductivity or as a structural element.
+This project demonstrates how to build a low-cost touch screen prototype using conductive materials and the ESP32’s built-in capacitive touch pins. It serves as a flexible foundation for gesture interfaces, interactive systems, or experimental hardware UI.
 
-- LEDs – Visual indicators or display components.
+---
 
-- Thin Wooden Board – Serves as the base or mounting platform for the Aluminum.
+## Materials
 
-## Algoritmo de movimiento
-The touch system works with a minimum of six capacitive sensors, arranged in a 2x3 matrix.
+* **ESP32** – Main microcontroller responsible for signal processing and movement detection.
+* **Aluminum Sheet or Foil** – Used as touch plates for capacitance sensing.
+* **LEDs** – Provide visual feedback for touch or movement events.
+* **Thin Wooden Board** – Serves as a mounting surface and insulator for the aluminum plates.
 
-This matrix can be expanded modularly depending on how many extra plates you want to add.
-It’s important that the total number of plates (vertically) is even, because the algorithm detects “Up” and “Down” movements by recognizing a slide between the top and bottom rows.
+---
 
-An odd number of interconnected plates is required for the system to correctly determine the vertical direction of the cursor movement.
-This design choice is made because the ESP32 used in this project has only 8 available touch pins, so the matrix is optimized to make the best use of those resources.
+## Algorithm Overview
 
-The horizontal detection (Left/Right) algorithm is a bit more complex.
-Each group of three plates acts as an analysis region that helps predict the user’s finger movement.
-With this setup, it’s not necessary to start sliding from a specific edge, and you can connect any number of plates, either even or odd.
+The touch system uses at least six capacitive sensors, arranged in a 2x3 matrix. This layout can be expanded modularly depending on the number of additional plates.
 
-The basic plate connection layout looks like this:
+### Vertical Detection (Up/Down)
+
+* The total number of vertical plates must be even.
+* This configuration enables detection of movement between upper and lower rows.
+* The ESP32 has eight available touch pins, so the algorithm is optimized to use them efficiently.
+
+### Horizontal Detection (Left/Right)
+
+* Each group of three plates acts as an analysis region to predict horizontal movement.
+* Movements can start from any position—no fixed origin required.
+* The system supports both even and odd numbers of horizontal modules.
+
+### Base Configuration
 
 ```
 1 | 2 | 3
 4 | 5 | 6
 ```
 
-From this base configuration, plates can be interconnected in repeating patterns, for example:
+### Expanded Modular Pattern
 
 ```
 1 | 2 | 3 | 4 | 5 | 6
@@ -45,4 +55,15 @@ From this base configuration, plates can be interconnected in repeating patterns
 4 | 5 | 6 | 4 | 5 | 6
 ```
 
-In this diagram, the repeated numbers show the connections between touch modules, allowing the system to scale up while keeping the movement detection algorithm consistent.
+Repeated numbers represent interconnected plates between modules, allowing scalability while keeping the detection algorithm consistent.
+
+---
+
+## Future Improvements
+
+* Implement gesture recognition (diagonal or circular motion).
+* Add an OLED display or web interface for visualization.
+* Improve signal filtering and stability.
+* Develop a reusable library for dynamic matrix configuration.
+
+---
