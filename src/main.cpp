@@ -33,10 +33,10 @@ void loop() {
   // --- Cual sensor está tocando ---
   for (int i = 0; i < 10; i++) {
     int val = touchRead(sensors[i]);
-
     if (val < THRESHOLD && val > 0) {
       currentSensor = i; // guardamos índice del sensor activo
       lastTouchTime = millis(); // actualizar momento del último toque
+      Serial.print(currentSensor);
       break; // solo consideramos el primero que se toque
     }
   }
@@ -56,12 +56,14 @@ void loop() {
             (lastRowSensor == 0 && currentSensor == 4) || 
             (lastRowSensor == 4 && currentSensor == 3)) {
           Serial.println("derecha");
+          Serial.flush();
         }
         // Movimientos IZQUIERDA
         else if ((lastRowSensor == 0 && currentSensor == 3) || 
                  (lastRowSensor == 4 && currentSensor == 0) || 
                  (lastRowSensor == 3 && currentSensor == 4)) {
           Serial.println("izquierda");
+          Serial.flush();
         }
       }
       lastRowSensor = currentSensor; // actualizar último de la fila

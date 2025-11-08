@@ -1,43 +1,58 @@
-# mouse_control_serial.py
-import pyautogui
+import time
 import serial
+import pyautogui
 
-# pasos del cusror
-STEP = 20  
+STEP = 20
+PORT = '/dev/ttyUSB0'
+BAUD = 115200
 
-#Puerto de la esp32
-ser = serial.Serial('/dev/ttyUSB0', 115200, timeout=1)
+def connect_serial():
+    while True:
+        try:
+            ser = serial.Serial(PORT, BAUD, timeout=0.1)
+            time.sleep(2)
+            print(f"CONNECT {PORT}")
+            return ser
+        except serial.SerialException:
+            print("NO CONNECT, RELOADING...")
+            time.sleep(2)
 
-def derecha():
+def mover(direccion):
     x, y = pyautogui.position()
-    pyautogui.moveTo(x + STEP, y)
+    if direccion == "derecha":
+        pyautogui.moveTo(x + STEP, y)
+    elif direccion == "izquierda":
+        pyautogui.moveTo(x - STEP, y)
+    elif direccion == "arriba":
+        pyautogui.moveTo(x, y - STEP)
+    elif direccion == "abajo":
+        pyautogui.moveTo(x, y + STEP)
 
-def izquierda():
-    x, y = pyautogui.position()
-    pyautogui.moveTo(x - STEP, y)
+def main():
+    ser = connect_serial()
+    print("waiting to ESP32...")
 
-def arriba():
-    x, y = pyautogui.position()
-    pyautogui.moveTo(x, y - STEP)
+    buffer = ""
+    while True:
+        try:
+            if ser.in_waiting > 0:
+                data = ser.read(ser.in_waiting).decode(errors='ignore')
+                buffer += data
+                if '\n' in buffer:
+                    lines = buffer.split('\n')
+                    for line in lines[:-1]:
+                        line = line.strip()
+                        if line:
+                            print(f"command: {line}")
+                            mover(line.lower())
+                    buffer = lines[-1]
+        except serial.SerialException:
+            print("Lost conection.")
+            ser.close()
+            ser = connect_serial()
+        except Exception as e:
+            print("Error:", e)
+            time.sleep(1)
 
-def abajo():
-    x, y = pyautogui.position()
-    pyautogui.moveTo(x, y + STEP)
-
-print("Esperando comandos del ESP32...")
-
-while True:
-    line = ser.readline().decode().strip()
-    if not line:
-        continue
-
-    print(f"Comando recibido: {line}")
-
-    if line.lower() == "arriba":
-        arriba()
-    elif line.lower() == "abajo":
-        abajo()
-    elif line.lower() == "izquierda":
-        izquierda()
-    elif line.lower() == "derecha":
-        derecha()
+if __name__ == "__main__":
+    main()
