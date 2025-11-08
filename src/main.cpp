@@ -1,73 +1,161 @@
 #include <Arduino.h>
 
-// --- Sensores táctiles del ESP32 ---
+// --- Button and LED pins ---
+#define BUTTON_PIN 0     // BOOT button (GPIO0)
+#define LED_ON 12      // Green LED
+#define LED_OFF 18       // Red LED
+
+bool touchEnabled = true;     // Touchpad starts ON
+bool lastButtonState = HIGH;  // Button is not pressed
+
+// --- ESP32 touch sensors ---
 #define TOUCH_T0 4    // D4
-#define TOUCH_T1 0    // D0
-#define TOUCH_T2 2    // D2
 #define TOUCH_T3 15   // D15
 #define TOUCH_T4 13   // D13
-#define TOUCH_T5 12   // D12
 #define TOUCH_T6 14   // D14
 #define TOUCH_T7 27   // D27
 #define TOUCH_T8 33   // D33
-#define TOUCH_T9 32   // D32
-#define THRESHOLD 40  
 
-int sensors[] = {TOUCH_T0, TOUCH_T1, TOUCH_T2, TOUCH_T3, TOUCH_T4, TOUCH_T5, TOUCH_T6, TOUCH_T7, TOUCH_T8, TOUCH_T9};
-const char* names[] = {"T0","T1","T2","T3","T4","T5","T6","T7","T8","T9"};
+#define THRESHOLD 40
+#define TIMEOUT 250  // ms without touch -> reset
 
-int lastSensor = -1;       // Para tracking de dirección
-int lastRowSensor = -1;    // Para tu fila 1x3
-unsigned long lastTouchTime = 0; // momento del último toque
-const unsigned long TIMEOUT = 500; // 500 ms
+int sensors[] = {TOUCH_T0, TOUCH_T3, TOUCH_T4, TOUCH_T6, TOUCH_T7, TOUCH_T8};
+const char* names[] = {"T0", "T3", "T4", "T6", "T7", "T8"};
+
+// --- State variables ---
+int lastSensor = -1;
+int lastRowSensor = -1;
+int lastGroup = -1;           // 0 = group 1 (T3-T0-T4), 1 = group 2 (T6-T7-T8)
+unsigned long lastTouchTime = 0;
+
+bool verticalMode = false;
+String verticalDirection = "";  // "arriba" or "abajo"
 
 void setup() {
   Serial.begin(115200);
   delay(1000);
-  Serial.println("Lectura táctil ESP32 lista...");
+  Serial.println("ESP32 touch sensors ready...");
+
+  // Configure pins
+  pinMode(BUTTON_PIN, INPUT_PULLUP);
+  pinMode(LED_ON, OUTPUT);
+  pinMode(LED_OFF, OUTPUT);
+
+  // Start with touch enabled
+  digitalWrite(LED_ON, HIGH);
+  digitalWrite(LED_OFF, LOW);
 }
 
 void loop() {
   int currentSensor = -1;
+  int currentGroup = -1;
 
-  // --- Cual sensor está tocando ---
-  for (int i = 0; i < 10; i++) {
-    int val = touchRead(sensors[i]);
-    if (val < THRESHOLD && val > 0) {
-      currentSensor = i; // guardamos índice del sensor activo
-      lastTouchTime = millis(); // actualizar momento del último toque
-      Serial.print(currentSensor);
-      break; // solo consideramos el primero que se toque
+  // --- Handle button press ---
+  bool reading = digitalRead(BUTTON_PIN);
+
+  // Detect press transition
+  if (reading == LOW && lastButtonState == HIGH) {
+    touchEnabled = !touchEnabled;
+
+    if (touchEnabled) {
+      Serial.println("touch_on");
+      digitalWrite(LED_ON, HIGH);
+      digitalWrite(LED_OFF, LOW);
+    } else {
+      Serial.println("touch_off");
+      digitalWrite(LED_ON, LOW);
+      digitalWrite(LED_OFF, HIGH);
     }
   }
 
-  // --- Si pasa más de 500ms sin tocar nada, borrar último ---
+  lastButtonState = reading;
+
+  // If touchpad is disabled -> skip everything
+  if (!touchEnabled) return;
+
+  // --- Read all touch sensors ---
+  for (int i = 0; i < 6; i++) {
+    int value = touchRead(sensors[i]);
+    if (value < THRESHOLD && value > 0) {
+      currentSensor = i;
+      lastTouchTime = millis();
+      break;
+    }
+  }
+
+  // --- If no touch for TIMEOUT -> reset all states ---
   if (currentSensor == -1 && millis() - lastTouchTime > TIMEOUT) {
     lastSensor = -1;
     lastRowSensor = -1;
+    lastGroup = -1;
+    verticalMode = false;
+    verticalDirection = "";
   }
 
-  // --- Detectar dirección en la fila t3-t0-t4 ---
+  // --- If there is touch ---
   if (currentSensor != -1) {
-    if (currentSensor == 3 || currentSensor == 0 || currentSensor == 4) {
-      if (lastRowSensor != -1 && currentSensor != lastRowSensor) {
-        // Movimientos DERECHA
-        if ((lastRowSensor == 3 && currentSensor == 0) || 
-            (lastRowSensor == 0 && currentSensor == 4) || 
-            (lastRowSensor == 4 && currentSensor == 3)) {
-          Serial.println("derecha");
-          Serial.flush();
-        }
-        // Movimientos IZQUIERDA
-        else if ((lastRowSensor == 0 && currentSensor == 3) || 
-                 (lastRowSensor == 4 && currentSensor == 0) || 
-                 (lastRowSensor == 3 && currentSensor == 4)) {
-          Serial.println("izquierda");
-          Serial.flush();
-        }
+    // Determine which group it belongs to
+    if (currentSensor <= 2) currentGroup = 0; // T3, T0, T4
+    else currentGroup = 1;                    // T6, T7, T8
+
+    // --- Vertical movement (between groups) ---
+    if (!verticalMode && lastGroup != -1 && currentGroup != lastGroup) {
+      if (lastGroup == 0 && currentGroup == 1) {
+        Serial.println("arriba");
+        verticalDirection = "arriba";
+      } else if (lastGroup == 1 && currentGroup == 0) {
+        Serial.println("abajo");
+        verticalDirection = "abajo";
       }
-      lastRowSensor = currentSensor; // actualizar último de la fila
+      Serial.flush();
+      verticalMode = true;  // Activate vertical mode
     }
-    lastSensor = currentSensor; // actualizar último global
+
+    // --- If vertical mode is active, move only when touching new sensors ---
+    else if (verticalMode && currentSensor != lastSensor) {
+      Serial.println(verticalDirection);
+      Serial.flush();
+    }
+
+    // --- Horizontal movement (within the same group) ---
+    else if (!verticalMode) {
+      // Group 1 -> T3(1), T0(0), T4(2)
+      if (currentGroup == 0) {
+        if (lastRowSensor != -1 && currentSensor != lastRowSensor) {
+          if ((lastRowSensor == 1 && currentSensor == 0) ||
+              (lastRowSensor == 0 && currentSensor == 2) ||
+              (lastRowSensor == 2 && currentSensor == 1)) {
+            Serial.println("derecha");
+          } else if ((lastRowSensor == 0 && currentSensor == 1) ||
+                     (lastRowSensor == 2 && currentSensor == 0) ||
+                     (lastRowSensor == 1 && currentSensor == 2)) {
+            Serial.println("izquierda");
+          }
+          Serial.flush();
+        }
+        lastRowSensor = currentSensor;
+      }
+
+      // Group 2 -> T6(3), T7(4), T8(5)
+      if (currentGroup == 1) {
+        if (lastRowSensor != -1 && currentSensor != lastRowSensor) {
+          if ((lastRowSensor == 3 && currentSensor == 4) ||
+              (lastRowSensor == 4 && currentSensor == 5) ||
+              (lastRowSensor == 5 && currentSensor == 3)) {
+            Serial.println("derecha");
+          } else if ((lastRowSensor == 4 && currentSensor == 3) ||
+                     (lastRowSensor == 5 && currentSensor == 4) ||
+                     (lastRowSensor == 3 && currentSensor == 5)) {
+            Serial.println("izquierda");
+          }
+          Serial.flush();
+        }
+        lastRowSensor = currentSensor;
+      }
+    }
+
+    // Update last state
+    lastGroup = currentGroup;
+    lastSensor = currentSensor;
   }
 }

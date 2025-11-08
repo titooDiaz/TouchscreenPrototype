@@ -3,7 +3,7 @@ import serial
 import pyautogui
 
 STEP = 20
-PORT = '/dev/ttyUSB0'
+PORT = '/dev/ttyUSB0' # ls /dev/tty*
 BAUD = 115200
 
 def connect_serial():
