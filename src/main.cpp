@@ -1,47 +1,45 @@
 #include <Arduino.h>
-
 // --- Button and LED pins ---
-#define BUTTON_PIN 0     // BOOT button (GPIO0)
-#define LED_ON 12      // Green LED
-#define LED_OFF 18       // Red LED
+#define BUTTON_PIN 0 // Boot button (GPIO0)
+#define LED_ON 12 // Green LED
+#define LED_OFF 18 // Red LED
 
-bool touchEnabled = true;     // Touchpad starts ON
-bool lastButtonState = HIGH;  // Button is not pressed
+bool touchEnabled = true; // Touchpad starts enabled
+bool lastButtonState = HIGH; // Button not pressed
 
 // --- ESP32 touch sensors ---
-#define TOUCH_T0 4    // D4
-#define TOUCH_T3 15   // D15
-#define TOUCH_T4 13   // D13
-#define TOUCH_T6 14   // D14
-#define TOUCH_T7 27   // D27
-#define TOUCH_T8 33   // D33
+#define TOUCH_T0 4    
+#define TOUCH_T3 15   
+#define TOUCH_T4 13   
+#define TOUCH_T6 14   
+#define TOUCH_T7 27   
+#define TOUCH_T8 33   
 
 #define THRESHOLD 40
-#define TIMEOUT 250  // ms without touch -> reset
+#define TIMEOUT 250  // Reset delay
 
 int sensors[] = {TOUCH_T0, TOUCH_T3, TOUCH_T4, TOUCH_T6, TOUCH_T7, TOUCH_T8};
 const char* names[] = {"T0", "T3", "T4", "T6", "T7", "T8"};
 
-// --- State variables ---
 int lastSensor = -1;
 int lastRowSensor = -1;
-int lastGroup = -1;           // 0 = group 1 (T3-T0-T4), 1 = group 2 (T6-T7-T8)
+int lastGroup = -1; // 0 = group 1, 1 = group 2
 unsigned long lastTouchTime = 0;
 
 bool verticalMode = false;
-String verticalDirection = "";  // "arriba" or "abajo"
+String verticalDirection = ""; // "arriba" / "abajo"
 
 void setup() {
   Serial.begin(115200);
   delay(1000);
   Serial.println("ESP32 touch sensors ready...");
 
-  // Configure pins
+  // Pin setup
   pinMode(BUTTON_PIN, INPUT_PULLUP);
   pinMode(LED_ON, OUTPUT);
   pinMode(LED_OFF, OUTPUT);
 
-  // Start with touch enabled
+  // Touchpad ON at start
   digitalWrite(LED_ON, HIGH);
   digitalWrite(LED_OFF, LOW);
 }
@@ -50,10 +48,10 @@ void loop() {
   int currentSensor = -1;
   int currentGroup = -1;
 
-  // --- Handle button press ---
+  // --- Button control ---
   bool reading = digitalRead(BUTTON_PIN);
 
-  // Detect press transition
+  // Detect press
   if (reading == LOW && lastButtonState == HIGH) {
     touchEnabled = !touchEnabled;
 
@@ -70,10 +68,10 @@ void loop() {
 
   lastButtonState = reading;
 
-  // If touchpad is disabled -> skip everything
+  // Touch disabled → stop here
   if (!touchEnabled) return;
 
-  // --- Read all touch sensors ---
+  // --- Read touch sensors ---
   for (int i = 0; i < 6; i++) {
     int value = touchRead(sensors[i]);
     if (value < THRESHOLD && value > 0) {
@@ -83,7 +81,7 @@ void loop() {
     }
   }
 
-  // --- If no touch for TIMEOUT -> reset all states ---
+  // --- Reset states if no touch ---
   if (currentSensor == -1 && millis() - lastTouchTime > TIMEOUT) {
     lastSensor = -1;
     lastRowSensor = -1;
@@ -92,13 +90,13 @@ void loop() {
     verticalDirection = "";
   }
 
-  // --- If there is touch ---
+  // --- Touch detected ---
   if (currentSensor != -1) {
-    // Determine which group it belongs to
-    if (currentSensor <= 2) currentGroup = 0; // T3, T0, T4
-    else currentGroup = 1;                    // T6, T7, T8
+    // Pick group
+    if (currentSensor <= 2) currentGroup = 0; 
+    else currentGroup = 1;
 
-    // --- Vertical movement (between groups) ---
+    // --- Vertical movement ---
     if (!verticalMode && lastGroup != -1 && currentGroup != lastGroup) {
       if (lastGroup == 0 && currentGroup == 1) {
         Serial.println("arriba");
@@ -108,18 +106,19 @@ void loop() {
         verticalDirection = "abajo";
       }
       Serial.flush();
-      verticalMode = true;  // Activate vertical mode
+      verticalMode = true;
     }
 
-    // --- If vertical mode is active, move only when touching new sensors ---
+    // Vertical mode active → only repeat movement on new sensor
     else if (verticalMode && currentSensor != lastSensor) {
       Serial.println(verticalDirection);
       Serial.flush();
     }
 
-    // --- Horizontal movement (within the same group) ---
+    // --- Horizontal movement ---
     else if (!verticalMode) {
-      // Group 1 -> T3(1), T0(0), T4(2)
+
+      // Group 1
       if (currentGroup == 0) {
         if (lastRowSensor != -1 && currentSensor != lastRowSensor) {
           if ((lastRowSensor == 1 && currentSensor == 0) ||
@@ -136,7 +135,7 @@ void loop() {
         lastRowSensor = currentSensor;
       }
 
-      // Group 2 -> T6(3), T7(4), T8(5)
+      // Group 2
       if (currentGroup == 1) {
         if (lastRowSensor != -1 && currentSensor != lastRowSensor) {
           if ((lastRowSensor == 3 && currentSensor == 4) ||
@@ -154,7 +153,7 @@ void loop() {
       }
     }
 
-    // Update last state
+    // Update state
     lastGroup = currentGroup;
     lastSensor = currentSensor;
   }

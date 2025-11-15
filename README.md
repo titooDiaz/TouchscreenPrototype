@@ -1,4 +1,5 @@
-<div style="text-align: center;">
+<div align="center">
+  <img src="./h1.svg" alt="Touch-Screen-Icon" style="width: 30%; max-width: 100%;">
   <img src="./icon.svg" alt="Touch-Screen-Icon" style="width: 30%; max-width: 100%;">
 </div>
 
